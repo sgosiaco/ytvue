@@ -68,29 +68,86 @@ const sanitize = require('sanitize-filename')
 
 const onAudioProgress = (chunkLength, downloaded, total) => {
   const percent = downloaded / total
-  // mainWindow.send('log', `${(percent * 100).toFixed(2)}% downloaded `)
-  // mainWindow.send('log', `(${(downloaded / 1024 / 1024).toFixed(2)}MB of ${(total / 1024 / 1024).toFixed(2)}MB)`)
   mainWindow.send('audioProgress', (percent * 100).toFixed(2), `${(downloaded / 1024 / 1024).toFixed(2)}MB of ${(total / 1024 / 1024).toFixed(2)}MB`)
 }
 
 const onVideoProgress = (chunkLength, downloaded, total) => {
   const percent = downloaded / total
-  // mainWindow.send('log', `${(percent * 100).toFixed(2)}% downloaded `)
-  // mainWindow.send('log', `(${(downloaded / 1024 / 1024).toFixed(2)}MB of ${(total / 1024 / 1024).toFixed(2)}MB)`)
   mainWindow.send('videoProgress', (percent * 100).toFixed(2), `${(downloaded / 1024 / 1024).toFixed(2)}MB of ${(total / 1024 / 1024).toFixed(2)}MB`)
 }
 
-// global.audioStream = null
-// global.videoStream = null
-// global.audioFF = null
-// global.videoFF = null
+const cancelAll = (err) => {
+  console.error(err)
+  console.log('cancel')
+  // console.log(global.audioStream)
+  // console.log(global.audioFF)
+  if (global.audioStream !== null) {
+    console.log('audio destroy')
+    global.audioStream.destroy()
+  }
+
+  if (global.videoStream !== null) {
+    console.log('video destroy')
+    global.videoStream.destroy()
+    global.videoStream = null
+  }
+
+  if (global.audioFF !== null) {
+    console.log('audioFF kill')
+    global.audioFF.kill()
+    global.audioFF = null
+  }
+
+  if (global.videoFF !== null) {
+    console.log('videoFF kill')
+    global.videoFF.kill()
+    global.videoFF = null
+  }
+
+  /*
+  leaving out auto clean up for now.
+  let user manually delete
+
+  if (fs.existsSync(global.savePath)) {
+    fs.unlinkSync(global.savePath)
+  }
+
+  if (fs.existsSync(global.savePath + '.tmp')) {
+    fs.unlinkSync(global.savePath + '.tmp')
+  }
+
+  if (fs.existsSync(global.savePath.split('.mp4')[0] + '.mp3')) {
+    fs.unlinkSync(global.savePath.split('.mp4')[0] + '.mp3')
+  }
+  */
+  mainWindow.send('ffProgress', true)
+}
+
+const finish = () => {
+  console.log('\ndone')
+  if (fs.existsSync(global.savePath + '.tmp')) {
+    fs.unlinkSync(global.savePath + '.tmp')
+  }
+  global.audioStream = null
+  global.videoStream = null
+  global.audioFF = null
+  global.videoFF = null
+  global.savePath = null
+  mainWindow.send('ffProgress', true)
+}
+
+global.audioStream = null
+global.videoStream = null
+global.audioFF = null
+global.videoFF = null
+global.savePath = null
 
 ipcMain.on('download', (event, url, audioOnly, keepMP3) => {
   console.log('downloading track')
 
   ytdl.getInfo(url, (err, info) => {
     if (err) {
-      console.log(err)
+      cancelAll(err)
     } else {
       mainWindow.send('info', info)
       const title = sanitize(info.title)
@@ -100,17 +157,17 @@ ipcMain.on('download', (event, url, audioOnly, keepMP3) => {
       // const videoFormat = ytdl.chooseFormat(ytdl.filterFormats(info.formats, format => format.container === 'mp4'), { quality: 'highestvideo' }) // && !format.audioEncoding
       const videoPath = path.join(app.getPath('videos'), `${title}`) // .${videoFormat.container}
 
-      let savePath
+      // let savePath
 
       if (audioOnly) {
-        savePath = dialog.showSaveDialogSync({
+        global.savePath = dialog.showSaveDialogSync({
           defaultPath: audioPath,
           filters: [
             { name: '.mp3', extensions: ['mp3'] }
           ]
         })
       } else {
-        savePath = dialog.showSaveDialogSync({
+        global.savePath = dialog.showSaveDialogSync({
           defaultPath: videoPath,
           filters: [
             { name: '.mp4', extensions: ['mp4'] }
@@ -118,85 +175,57 @@ ipcMain.on('download', (event, url, audioOnly, keepMP3) => {
         })
       }
 
-      if (savePath !== undefined) {
+      if (global.savePath !== undefined) {
         // download from info
-        const audioStream = ytdl.downloadFromInfo(info, {
+        global.audioStream = ytdl.downloadFromInfo(info, {
           quality: 'highestaudio'
-        }).on('progress', onAudioProgress)
+        })
+          .on('progress', onAudioProgress)
+          .on('error', cancelAll)
 
         if (audioOnly) {
-          ffmpeg(audioStream)
+          // save audio
+          global.audioFF = ffmpeg(global.audioStream)
             .audioBitrate(audioBitrate)
-            .save(savePath)
-            .on('end', () => {
-              console.log('\ndone')
-              mainWindow.send('ffProgress', true)
-            })
+            .save(global.savePath)
+            .on('error', cancelAll)
+            .on('end', finish)
         } else {
-          audioStream.pipe(fs.createWriteStream(savePath + '.tmp'))
+          // download video too
+          global.audioStream.pipe(fs.createWriteStream(global.savePath + '.tmp'))
             .on('finish', () => {
               const videoStream = ytdl.downloadFromInfo(info, {
                 quality: 'highestvideo'
-              }).on('progress', onVideoProgress)
+              })
+                .on('progress', onVideoProgress)
+                .on('error', cancelAll)
 
-              ffmpeg()
+              global.videoFF = ffmpeg()
                 .input(videoStream)
                 .videoCodec('copy')
-                .input(savePath + '.tmp')
-                .save(savePath)
-                .on('error', console.error)
+                .input(global.savePath + '.tmp')
+                .save(global.savePath)
+                .on('error', cancelAll)
                 .on('end', () => {
                   if (keepMP3) {
-                    ffmpeg()
-                      .input(savePath + '.tmp')
+                    global.audioFF = ffmpeg()
+                      .input(global.savePath + '.tmp')
                       .audioBitrate(audioBitrate)
-                      .save(savePath.split('.mp4')[0] + '.mp3')
-                      .on('end', () => {
-                        fs.unlink(savePath + '.tmp', err => {
-                          if (err) console.error(err)
-                          else mainWindow.send('ffProgress', true)
-                        })
-                      })
+                      .save(global.savePath.split('.mp4')[0] + '.mp3')
+                      .on('error', cancelAll)
+                      .on('end', finish)
                   } else {
-                    fs.unlink(savePath + '.tmp', err => {
-                      if (err) console.error(err)
-                      else mainWindow.send('ffProgress', true)
-                    })
+                    finish()
                   }
                 })
             })
         }
       } else {
-        // if (audioOnly) {
-        //  mainWindow.send('audioProgress', 100)
-        // } else {
-        //  mainWindow.send('videoProgress', 100)
-        // }
+        // no path selected
         mainWindow.send('ffProgress', true)
       }
     }
   })
 })
 
-ipcMain.on('cancel', (event) => {
-  console.log('cancel')
-  console.log(global.audioStream)
-  console.log(global.audioFF)
-  if (global.audioStream !== null) {
-    console.log('audio destroy')
-    global.audioStream.destroy()
-  }
-
-  if (global.videoStream !== null) {
-    global.videoStream.destroy()
-  }
-
-  if (global.audioFF !== null) {
-    console.log('audioFF kill')
-    global.audioFF.kill()
-  }
-
-  if (global.videoFF !== null) {
-    global.videoFF.kill()
-  }
-})
+ipcMain.on('cancel', cancelAll)

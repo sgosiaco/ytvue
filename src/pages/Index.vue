@@ -118,7 +118,7 @@ export default {
           this.loading = true
         }
       } else {
-        if (percent >= 100 && this.audioOnly) {
+        if (percent >= 100) { // && this.audioOnly
           // this.loading = false
           // this.info = null
           this.audioPercentage = 0
@@ -133,8 +133,8 @@ export default {
       if (percent >= 100) {
         // this.loading = false
         // this.info = null
-        this.audioPercentage = 0
-        this.audioSize = ''
+        // this.audioPercentage = 0
+        // this.audioSize = ''
         this.videoPercentage = 0
         this.videoSize = ''
       }
@@ -144,6 +144,10 @@ export default {
       if (this.loading && done) {
         this.loading = false
         this.info = null
+        this.audioPercentage = 0
+        this.audioSize = ''
+        this.videoPercentage = 0
+        this.videoSize = ''
       }
     })
 
