@@ -26,13 +26,23 @@
         </q-btn>
       </div>
       <div class ="q-gutter-md column">
-        <q-toggle
-          class="float-right row"
-          v-model="audioOnly"
-          left-label
-          label="Audio only"
-          :disable="loading"
-        />
+        <div class="q-gutter-sm">
+          <q-toggle
+            class="float-right col"
+            v-model="audioOnly"
+            left-label
+            label="Audio only"
+            :disable="loading"
+          />
+          <q-toggle
+            class="float-right col"
+            v-model="keepMP3"
+            left-label
+            label="Keep MP3"
+            :disable="loading"
+            v-if="!audioOnly"
+          />
+        </div>
         <div class="q-gutter-md row">
           <q-linear-progress class="col" size="25px" :value="audioPercentage/100" color="positive" v-if="audioPercentage > 0 && audioPercentage < 100">
             <div class="absolute-full flex flex-center">
@@ -128,13 +138,14 @@ export default {
     download () {
       if (this.exp.test(this.url)) {
         this.loading = true
-        this.$q.electron.ipcRenderer.send('download', this.url, this.audioOnly)
+        this.$q.electron.ipcRenderer.send('download', this.url, this.audioOnly, this.keepMP3)
       }
     }
   },
   data () {
     return {
       audioOnly: true,
+      keepMP3: false,
       loading: false,
       audioSize: '',
       audioPercentage: 0,

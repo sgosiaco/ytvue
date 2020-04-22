@@ -85,7 +85,7 @@ const onVideoProgress = (chunkLength, downloaded, total) => {
 // global.audioFF = null
 // global.videoFF = null
 
-ipcMain.on('download', (event, url, audioOnly) => {
+ipcMain.on('download', (event, url, audioOnly, keepMP3) => {
   console.log('downloading track')
 
   ytdl.getInfo(url, (err, info) => {
@@ -96,19 +96,25 @@ ipcMain.on('download', (event, url, audioOnly) => {
       const title = sanitize(info.title)
       const audioFormat = ytdl.chooseFormat(info.formats, { quality: 'highestaudio' })
       const audioBitrate = audioFormat.audioBitrate
-      const audioPath = path.join(app.getPath('music'), `${title}.mp3`)
-      const videoFormat = ytdl.chooseFormat(ytdl.filterFormats(info.formats, format => format.container === 'mp4'), { quality: 'highestvideo' }) // && !format.audioEncoding
-      const videoPath = path.join(app.getPath('videos'), `${title}.${videoFormat.container}`)
+      const audioPath = path.join(app.getPath('music'), `${title}`)
+      // const videoFormat = ytdl.chooseFormat(ytdl.filterFormats(info.formats, format => format.container === 'mp4'), { quality: 'highestvideo' }) // && !format.audioEncoding
+      const videoPath = path.join(app.getPath('videos'), `${title}`) // .${videoFormat.container}
 
       let savePath
 
       if (audioOnly) {
         savePath = dialog.showSaveDialogSync({
-          defaultPath: audioPath
+          defaultPath: audioPath,
+          filters: [
+            { name: '.mp3', extensions: ['mp3'] }
+          ]
         })
       } else {
         savePath = dialog.showSaveDialogSync({
-          defaultPath: videoPath
+          defaultPath: videoPath,
+          filters: [
+            { name: '.mp4', extensions: ['mp4'] }
+          ]
         })
       }
 
@@ -139,10 +145,23 @@ ipcMain.on('download', (event, url, audioOnly) => {
                 .save(savePath)
                 .on('error', console.error)
                 .on('end', () => {
-                  fs.unlink(savePath + '.tmp', err => {
-                    if (err) console.error(err)
-                    else console.log('\ndone')
-                  })
+                  if (keepMP3) {
+                    ffmpeg()
+                      .input(savePath + '.tmp')
+                      .audioBitrate(audioBitrate)
+                      .save(savePath.split('.mp4')[0] + '.mp3')
+                      .on('end', () => {
+                        fs.unlink(savePath + '.tmp', err => {
+                          if (err) console.error(err)
+                          else console.log('\ndone')
+                        })
+                      })
+                  } else {
+                    fs.unlink(savePath + '.tmp', err => {
+                      if (err) console.error(err)
+                      else console.log('\ndone')
+                    })
+                  }
                 })
             })
         }
