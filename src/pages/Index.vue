@@ -25,7 +25,7 @@
           </template>
         </q-btn>
       </div>
-      <div class ="q-gutter-md column">
+      <div class ="q-gutter-y-md column">
         <div class="q-gutter-sm">
           <q-toggle
             class="float-right col"
@@ -42,22 +42,23 @@
             :disable="loading"
             v-if="!audioOnly"
           />
+          <q-toggle
+            class="float-right col"
+            v-model="loading"
+            left-label
+            label="Load"
+          />
         </div>
         <div class="q-gutter-md row">
-          <div class="col">
-            <q-linear-progress class="row" size="25px" :value="audioPercentage/100" color="positive" v-if="audioPercentage > 0 && audioPercentage < 100">
+          <div class="flex flex-center col">
+            <q-linear-progress class="row" size="25px" :value="percentage/100" color="positive" v-if="percentage > 0 && percentage < 100">
               <div class="absolute-full flex flex-center">
-                <q-badge color="transparent" text-color="white" :label="audioLabel"/>
-              </div>
-            </q-linear-progress>
-            <q-linear-progress class="row" size="25px" :value="videoPercentage/100" color="positive" v-if="videoPercentage > 0 && videoPercentage < 100">
-              <div class="absolute-full flex flex-center">
-                <q-badge color="transparent" text-color="white" :label="videoLabel"/>
+                <q-badge color="transparent" text-color="white" :label="label"/>
               </div>
             </q-linear-progress>
             <q-linear-progress class="row" size="25px" color="primary" indeterminate v-if="loading">
               <div class="absolute-full flex flex-center">
-                <q-badge color="transparent" text-color="white" label="FFMPEG"/>
+                <q-badge color="transparent" text-color="white" :label="ffLabel"/>
               </div>
             </q-linear-progress>
           </div>
@@ -82,15 +83,6 @@
 export default {
   name: 'PageIndex',
   computed: {
-    percentage: {
-      get () {
-        if (this.audioOnly) {
-          return parseFloat(this.audioPercentage)
-        } else {
-          return parseFloat(this.videoPercentage)
-        }
-      }
-    },
     infoLabel: {
       get () {
         if (this.info !== null) {
@@ -100,39 +92,23 @@ export default {
         }
       }
     },
-    audioLabel: {
+    ffLabel: {
       get () {
-        return `Audio: ${this.audioSize}`
-      }
-    },
-    videoLabel: {
-      get () {
-        return `Video: ${this.videoSize}`
+        return `Processing ${this.label.split(':')[0].toLowerCase()}...`
       }
     }
   },
   beforeCreate: function () {
-    this.$q.electron.ipcRenderer.on('audioProgress', (event, percent, size) => {
-      this.audioPercentage = percent
-      this.audioSize = size
+    this.$q.electron.ipcRenderer.on('progress', (event, percent, label) => {
+      this.percentage = percent
+      this.label = label
       if (!this.loading) {
-        if (percent > 0) {
-          this.loading = true
-        }
+        this.loading = percent > 0
       } else {
         if (percent >= 100) {
-          this.audioPercentage = 0
-          this.audioSize = ''
+          this.percentage = 0
+          this.label = ''
         }
-      }
-    })
-
-    this.$q.electron.ipcRenderer.on('videoProgress', (event, percent, size) => {
-      this.videoPercentage = percent
-      this.videoSize = size
-      if (percent >= 100) {
-        this.videoPercentage = 0
-        this.videoSize = ''
       }
     })
 
@@ -140,10 +116,8 @@ export default {
       if (this.loading && done) {
         this.loading = false
         this.info = null
-        this.audioPercentage = 0
-        this.audioSize = ''
-        this.videoPercentage = 0
-        this.videoSize = ''
+        this.percentage = 0
+        this.label = ''
       }
     })
 
@@ -166,10 +140,8 @@ export default {
       audioOnly: true,
       keepMP3: false,
       loading: false,
-      audioSize: '',
-      audioPercentage: 0,
-      videoSize: '',
-      videoPercentage: 0,
+      label: '',
+      percentage: 0,
       url: '',
       info: null,
       // eslint-disable-next-line no-useless-escape

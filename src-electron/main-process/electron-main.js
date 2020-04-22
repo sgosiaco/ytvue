@@ -68,12 +68,12 @@ const sanitize = require('sanitize-filename')
 
 const onAudioProgress = (chunkLength, downloaded, total) => {
   const percent = downloaded / total
-  mainWindow.send('audioProgress', (percent * 100).toFixed(2), `${(downloaded / 1024 / 1024).toFixed(2)}MB of ${(total / 1024 / 1024).toFixed(2)}MB`)
+  mainWindow.send('progress', (percent * 100).toFixed(2), `Audio: ${(downloaded / 1024 / 1024).toFixed(2)}MB of ${(total / 1024 / 1024).toFixed(2)}MB`)
 }
 
 const onVideoProgress = (chunkLength, downloaded, total) => {
   const percent = downloaded / total
-  mainWindow.send('videoProgress', (percent * 100).toFixed(2), `${(downloaded / 1024 / 1024).toFixed(2)}MB of ${(total / 1024 / 1024).toFixed(2)}MB`)
+  mainWindow.send('progress', (percent * 100).toFixed(2), `Video: ${(downloaded / 1024 / 1024).toFixed(2)}MB of ${(total / 1024 / 1024).toFixed(2)}MB`)
 }
 
 const cancelAll = (err) => {
@@ -103,22 +103,6 @@ const cancelAll = (err) => {
     global.videoFF = null
   }
 
-  /*
-  leaving out auto clean up for now.
-  let user manually delete
-
-  if (fs.existsSync(global.savePath)) {
-    fs.unlinkSync(global.savePath)
-  }
-
-  if (fs.existsSync(global.savePath + '.tmp')) {
-    fs.unlinkSync(global.savePath + '.tmp')
-  }
-
-  if (fs.existsSync(global.savePath.split('.mp4')[0] + '.mp3')) {
-    fs.unlinkSync(global.savePath.split('.mp4')[0] + '.mp3')
-  }
-  */
   mainWindow.send('ffProgress', true)
 }
 
