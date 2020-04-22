@@ -1,4 +1,5 @@
-import { app, BrowserWindow, nativeTheme } from 'electron'
+/* eslint-disable camelcase */
+import { app, BrowserWindow, nativeTheme, ipcMain } from 'electron'
 
 try {
   if (process.platform === 'win32' && nativeTheme.shouldUseDarkColors === true) {
@@ -21,6 +22,7 @@ function createWindow () {
    * Initial window options
    */
   mainWindow = new BrowserWindow({
+    frame: false,
     width: 1000,
     height: 600,
     useContentSize: true,
@@ -53,4 +55,61 @@ app.on('activate', () => {
   if (mainWindow === null) {
     createWindow()
   }
+})
+
+const ytdl = require('ytdl-core')
+const ffmpeg = require('fluent-ffmpeg')
+
+const onProgress = (chunkLength, downloaded, total) => {
+  const percent = downloaded / total
+  // readline.cursorTo(process.stdout, 0)
+  // process.stdout.write(`${(percent * 100).toFixed(2)}% downloaded `)
+  // process.stdout.write(`(${(downloaded / 1024 / 1024).toFixed(2)}MB of ${(total / 1024 / 1024).toFixed(2)}MB)`)
+  // console.log(`${(percent * 100).toFixed(2)}% downloaded `)
+  // console.log(`(${(downloaded / 1024 / 1024).toFixed(2)}MB of ${(total / 1024 / 1024).toFixed(2)}MB)`)
+  mainWindow.send('log', `${(percent * 100).toFixed(2)}% downloaded `)
+  mainWindow.send('log', `(${(downloaded / 1024 / 1024).toFixed(2)}MB of ${(total / 1024 / 1024).toFixed(2)}MB)`)
+  mainWindow.send('progress', percent * 100)
+}
+
+ipcMain.on('download', (event, url) => {
+  console.log('downloading track')
+  let title
+  let length_seconds
+  let name
+  let format
+  let bitrate
+  const printDebug = false
+
+  ytdl.getInfo(url, (err, info) => {
+    if (err) {
+      console.log(err)
+    } else {
+      // extract info
+      ({ title, length_seconds } = info)
+      name = info.author.name
+      format = ytdl.chooseFormat(info.formats, { quality: 'highestaudio' })
+      bitrate = format.audioBitrate
+
+      // logging
+      if (printDebug) {
+        console.log(info)
+        console.log(`${title} by ${name}`)
+        console.log(`${length_seconds}`)
+        console.log(format)
+      }
+
+      // download from info
+      const stream = ytdl.downloadFromInfo(info, {
+        quality: 'highestaudio'
+      }).on('progress', onProgress)
+
+      ffmpeg(stream)
+        .audioBitrate(bitrate)
+        .save('test.mp3')
+        .on('end', () => {
+          console.log('\ndone')
+        })
+    }
+  })
 })
