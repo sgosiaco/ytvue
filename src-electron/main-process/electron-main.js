@@ -1,5 +1,5 @@
 /* eslint-disable camelcase */
-import { app, BrowserWindow, nativeTheme, ipcMain } from 'electron'
+import { app, BrowserWindow, nativeTheme, ipcMain, dialog } from 'electron'
 
 try {
   if (process.platform === 'win32' && nativeTheme.shouldUseDarkColors === true) {
@@ -22,9 +22,11 @@ function createWindow () {
    * Initial window options
    */
   mainWindow = new BrowserWindow({
+    alwaysOnTop: true,
     frame: false,
-    width: 1000,
-    height: 600,
+    resizable: false,
+    width: 800,
+    height: 400,
     useContentSize: true,
     webPreferences: {
       // Change from /quasar.conf.js > electron > nodeIntegration;
@@ -59,6 +61,20 @@ app.on('activate', () => {
 
 const ytdl = require('ytdl-core')
 const ffmpeg = require('fluent-ffmpeg')
+// const fs = require('fs')
+const path = require('path')
+const sanitize = require('sanitize-filename')
+// import store from '../../store'
+
+// var songDir = path.join(app.getAppPath(), '..', '..', 'songs')
+
+// if (!fs.existsSync(songDir)) {
+//  fs.mkdirSync(songDir)
+// }
+
+// ipcMain.on('updateDir', (event, dir) => {
+//  songDir = dir
+// })
 
 const onProgress = (chunkLength, downloaded, total) => {
   const percent = downloaded / total
@@ -85,6 +101,7 @@ ipcMain.on('download', (event, url) => {
     if (err) {
       console.log(err)
     } else {
+      mainWindow.send('info', info);
       // extract info
       ({ title, length_seconds } = info)
       name = info.author.name
@@ -99,17 +116,25 @@ ipcMain.on('download', (event, url) => {
         console.log(format)
       }
 
-      // download from info
-      const stream = ytdl.downloadFromInfo(info, {
-        quality: 'highestaudio'
-      }).on('progress', onProgress)
+      const songDir = dialog.showSaveDialogSync({
+        defaultPath: path.join(app.getPath('music'), `${sanitize(title)}.mp3`)
+      })
 
-      ffmpeg(stream)
-        .audioBitrate(bitrate)
-        .save('test.mp3')
-        .on('end', () => {
-          console.log('\ndone')
-        })
+      if (songDir !== undefined) {
+        // download from info
+        const stream = ytdl.downloadFromInfo(info, {
+          quality: 'highestaudio'
+        }).on('progress', onProgress)
+
+        ffmpeg(stream)
+          .audioBitrate(bitrate)
+          .save(songDir)
+          .on('end', () => {
+            console.log('\ndone')
+          })
+      } else {
+        mainWindow.send('progress', 100)
+      }
     }
   })
 })

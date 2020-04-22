@@ -3,7 +3,6 @@
     <div>{{title}}</div>
     <q-space/>
     <q-btn dense flat icon="minimize" @click="minimize"/>
-    <q-btn dense flat :icon="isMaximized ? 'filter_none' : 'crop_square'" @click="maximize"/>
     <q-btn dense flat icon="close" @click="closeWindow"/>
   </q-bar>
 </template>

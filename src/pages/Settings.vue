@@ -11,8 +11,13 @@
 </template>
 
 <script>
+const path = require('path')
+
 export default {
   name: 'Settings',
+  created: function () {
+    this.directory = path.join(this.$q.electron.remote.app.getAppPath(), '..', '..', 'songs')
+  },
   methods: {
     selectPath () {
       const dir = this.$q.electron.remote.dialog.showOpenDialogSync({ properties: ['openDirectory'] })

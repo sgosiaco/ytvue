@@ -1,7 +1,7 @@
 import Vue from 'vue'
 import Vuex from 'vuex'
 
-// import example from './module-example'
+import { createPersistedState, createSharedMutations } from 'vuex-electron'
 
 Vue.use(Vuex)
 
@@ -16,10 +16,21 @@ Vue.use(Vuex)
 
 export default function (/* { ssrContext } */) {
   const Store = new Vuex.Store({
+    plugins: [
+      createPersistedState(),
+      createSharedMutations()
+    ],
     modules: {
       // example
     },
-
+    state: {
+      songDir: ''
+    },
+    mutations: {
+      modifySongDir (state, newDir) {
+        state.songDir = newDir
+      }
+    },
     // enable strict mode (adds overhead!)
     // for dev mode only
     strict: process.env.DEV

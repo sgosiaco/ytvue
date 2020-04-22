@@ -1,6 +1,9 @@
 <template>
   <q-page class="flex flex-center">
     <div class='q-pa-md'>
+      <div v-if="info !== null" class="row">
+          {{info.title}} by {{info.author.name}}
+      </div>
       <div class="q-gutter-md row">
         <q-input
           style="min-width: 500px"
@@ -37,7 +40,12 @@ export default {
       this.percentage = percent
       if (percent >= 100) {
         this.loading = false
+        this.info = null
       }
+    })
+
+    this.$q.electron.ipcRenderer.on('info', (event, info) => {
+      this.info = info
     })
   },
   methods: {
@@ -53,6 +61,7 @@ export default {
       loading: false,
       percentage: 0,
       url: '',
+      info: null,
       // eslint-disable-next-line no-useless-escape
       exp: RegExp('^(http(s)?:\/\/)?((w){3}.)?youtu(be|.be)?(\.com)?\/.+')
     }
