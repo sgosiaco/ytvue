@@ -130,6 +130,7 @@ ipcMain.on('download', (event, url, audioOnly, keepMP3) => {
             .save(savePath)
             .on('end', () => {
               console.log('\ndone')
+              mainWindow.send('ffProgress', true)
             })
         } else {
           audioStream.pipe(fs.createWriteStream(savePath + '.tmp'))
@@ -153,24 +154,25 @@ ipcMain.on('download', (event, url, audioOnly, keepMP3) => {
                       .on('end', () => {
                         fs.unlink(savePath + '.tmp', err => {
                           if (err) console.error(err)
-                          else console.log('\ndone')
+                          else mainWindow.send('ffProgress', true)
                         })
                       })
                   } else {
                     fs.unlink(savePath + '.tmp', err => {
                       if (err) console.error(err)
-                      else console.log('\ndone')
+                      else mainWindow.send('ffProgress', true)
                     })
                   }
                 })
             })
         }
       } else {
-        if (audioOnly) {
-          mainWindow.send('audioProgress', 100)
-        } else {
-          mainWindow.send('videoProgress', 100)
-        }
+        // if (audioOnly) {
+        //  mainWindow.send('audioProgress', 100)
+        // } else {
+        //  mainWindow.send('videoProgress', 100)
+        // }
+        mainWindow.send('ffProgress', true)
       }
     }
   })

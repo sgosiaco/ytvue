@@ -44,22 +44,29 @@
           />
         </div>
         <div class="q-gutter-md row">
-          <q-linear-progress class="col" size="25px" :value="audioPercentage/100" color="positive" v-if="audioPercentage > 0 && audioPercentage < 100">
-            <div class="absolute-full flex flex-center">
-              <q-badge color="white" text-color="black" :label="audioLabel"/>
-            </div>
-          </q-linear-progress>
-          <q-linear-progress class="col" size="25px" :value="videoPercentage/100" color="positive" v-if="!audioOnly && videoPercentage > 0 && videoPercentage < 100">
-            <div class="absolute-full flex flex-center">
-              <q-badge color="white" text-color="black" :label="videoLabel"/>
-            </div>
-          </q-linear-progress>
+          <div class="col">
+            <q-linear-progress class="row" size="25px" :value="audioPercentage/100" color="positive" v-if="audioPercentage > 0 && audioPercentage < 100">
+              <div class="absolute-full flex flex-center">
+                <q-badge color="transparent" text-color="white" :label="audioLabel"/>
+              </div>
+            </q-linear-progress>
+            <q-linear-progress class="row" size="25px" :value="videoPercentage/100" color="positive" v-if="!audioOnly && videoPercentage > 0 && videoPercentage < 100">
+              <div class="absolute-full flex flex-center">
+                <q-badge color="transparent" text-color="white" :label="videoLabel"/>
+              </div>
+            </q-linear-progress>
+            <q-linear-progress class="row" size="25px" color="primary" indeterminate v-if="loading">
+              <div class="absolute-full flex flex-center">
+                <q-badge color="transparent" text-color="white" label="FFMPEG"/>
+              </div>
+            </q-linear-progress>
+          </div>
           <q-btn
             style="max-width: 70px"
             class="col"
             color="negative"
             @click="cancel()"
-            v-if="loading && (audioPercentage > 0 || videoPercentage > 0)"
+            v-if="loading"
           >
             Cancel
           </q-btn>
@@ -106,11 +113,17 @@ export default {
     this.$q.electron.ipcRenderer.on('audioProgress', (event, percent, size) => {
       this.audioPercentage = percent
       this.audioSize = size
-      if (percent >= 100 && this.audioOnly) {
-        this.loading = false
-        this.info = null
-        this.audioPercentage = 0
-        this.audioSize = ''
+      if (!this.loading) {
+        if (percent > 0) {
+          this.loading = true
+        }
+      } else {
+        if (percent >= 100 && this.audioOnly) {
+          // this.loading = false
+          // this.info = null
+          this.audioPercentage = 0
+          this.audioSize = ''
+        }
       }
     })
 
@@ -118,12 +131,19 @@ export default {
       this.videoPercentage = percent
       this.videoSize = size
       if (percent >= 100) {
-        this.loading = false
-        this.info = null
+        // this.loading = false
+        // this.info = null
         this.audioPercentage = 0
         this.audioSize = ''
         this.videoPercentage = 0
         this.videoSize = ''
+      }
+    })
+
+    this.$q.electron.ipcRenderer.on('ffProgress', (event, done) => {
+      if (this.loading && done) {
+        this.loading = false
+        this.info = null
       }
     })
 
@@ -137,7 +157,7 @@ export default {
     },
     download () {
       if (this.exp.test(this.url)) {
-        this.loading = true
+        // this.loading = true
         this.$q.electron.ipcRenderer.send('download', this.url, this.audioOnly, this.keepMP3)
       }
     }
