@@ -39,13 +39,11 @@
               <q-badge color="white" text-color="black" :label="audioLabel"/>
             </div>
           </q-linear-progress>
-          <div v-if="!audioOnly && videoPercentage > 0 && videoPercentage < 100">
-            <q-linear-progress class="col" size="25px" :value="videoPercentage/100" color="primary">
-              <div class="absolute-full flex flex-center">
-                <q-badge color="white" text-color="black" :label="videoLabel"/>
-              </div>
-            </q-linear-progress>
-          </div>
+          <q-linear-progress class="col" size="25px" :value="videoPercentage/100" color="positive" v-if="!audioOnly && videoPercentage > 0 && videoPercentage < 100">
+            <div class="absolute-full flex flex-center">
+              <q-badge color="white" text-color="black" :label="videoLabel"/>
+            </div>
+          </q-linear-progress>
           <q-btn
             style="max-width: 70px"
             class="col"
