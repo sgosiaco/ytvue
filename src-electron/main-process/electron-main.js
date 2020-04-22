@@ -79,8 +79,7 @@ const onVideoProgress = (chunkLength, downloaded, total) => {
 const cancelAll = (err) => {
   console.error(err)
   console.log('cancel')
-  // console.log(global.audioStream)
-  // console.log(global.audioFF)
+
   if (global.audioStream !== null) {
     console.log('audio destroy')
     global.audioStream.destroy()
@@ -156,8 +155,6 @@ ipcMain.on('download', (event, url, audioOnly, keepMP3) => {
       const audioPath = path.join(app.getPath('music'), `${title}`)
       // const videoFormat = ytdl.chooseFormat(ytdl.filterFormats(info.formats, format => format.container === 'mp4'), { quality: 'highestvideo' }) // && !format.audioEncoding
       const videoPath = path.join(app.getPath('videos'), `${title}`) // .${videoFormat.container}
-
-      // let savePath
 
       if (audioOnly) {
         global.savePath = dialog.showSaveDialogSync({

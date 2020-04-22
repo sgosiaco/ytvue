@@ -50,7 +50,7 @@
                 <q-badge color="transparent" text-color="white" :label="audioLabel"/>
               </div>
             </q-linear-progress>
-            <q-linear-progress class="row" size="25px" :value="videoPercentage/100" color="positive" v-if="!audioOnly && videoPercentage > 0 && videoPercentage < 100">
+            <q-linear-progress class="row" size="25px" :value="videoPercentage/100" color="positive" v-if="videoPercentage > 0 && videoPercentage < 100">
               <div class="absolute-full flex flex-center">
                 <q-badge color="transparent" text-color="white" :label="videoLabel"/>
               </div>
@@ -61,15 +61,17 @@
               </div>
             </q-linear-progress>
           </div>
-          <q-btn
-            style="max-width: 70px"
-            class="col"
-            color="negative"
-            @click="cancel()"
-            v-if="loading"
-          >
-            Cancel
-          </q-btn>
+          <div class="flex flex-center float-right">
+            <q-btn
+              style="max-width: 70px; max-height: 35px"
+              class="col"
+              color="negative"
+              @click="cancel()"
+              v-if="loading"
+            >
+              Cancel
+            </q-btn>
+          </div>
         </div>
       </div>
     </div>
@@ -118,9 +120,7 @@ export default {
           this.loading = true
         }
       } else {
-        if (percent >= 100) { // && this.audioOnly
-          // this.loading = false
-          // this.info = null
+        if (percent >= 100) {
           this.audioPercentage = 0
           this.audioSize = ''
         }
@@ -131,10 +131,6 @@ export default {
       this.videoPercentage = percent
       this.videoSize = size
       if (percent >= 100) {
-        // this.loading = false
-        // this.info = null
-        // this.audioPercentage = 0
-        // this.audioSize = ''
         this.videoPercentage = 0
         this.videoSize = ''
       }
@@ -161,7 +157,6 @@ export default {
     },
     download () {
       if (this.exp.test(this.url)) {
-        // this.loading = true
         this.$q.electron.ipcRenderer.send('download', this.url, this.audioOnly, this.keepMP3)
       }
     }
