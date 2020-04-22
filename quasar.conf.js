@@ -53,6 +53,10 @@ module.exports = function (/* ctx */) {
       components: [],
       directives: [],
 
+      config: {
+        dark: true // can be auto|true|false
+      },
+
       // Quasar plugins
       plugins: []
     },

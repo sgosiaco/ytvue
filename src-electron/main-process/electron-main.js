@@ -22,6 +22,7 @@ function createWindow () {
    * Initial window options
    */
   mainWindow = new BrowserWindow({
+    backgroundColor: '#fff',
     alwaysOnTop: true,
     frame: false,
     resizable: false,
@@ -61,80 +62,120 @@ app.on('activate', () => {
 
 const ytdl = require('ytdl-core')
 const ffmpeg = require('fluent-ffmpeg')
-// const fs = require('fs')
+const fs = require('fs')
 const path = require('path')
 const sanitize = require('sanitize-filename')
-// import store from '../../store'
 
-// var songDir = path.join(app.getAppPath(), '..', '..', 'songs')
-
-// if (!fs.existsSync(songDir)) {
-//  fs.mkdirSync(songDir)
-// }
-
-// ipcMain.on('updateDir', (event, dir) => {
-//  songDir = dir
-// })
-
-const onProgress = (chunkLength, downloaded, total) => {
+const onAudioProgress = (chunkLength, downloaded, total) => {
   const percent = downloaded / total
-  // readline.cursorTo(process.stdout, 0)
-  // process.stdout.write(`${(percent * 100).toFixed(2)}% downloaded `)
-  // process.stdout.write(`(${(downloaded / 1024 / 1024).toFixed(2)}MB of ${(total / 1024 / 1024).toFixed(2)}MB)`)
-  // console.log(`${(percent * 100).toFixed(2)}% downloaded `)
-  // console.log(`(${(downloaded / 1024 / 1024).toFixed(2)}MB of ${(total / 1024 / 1024).toFixed(2)}MB)`)
-  mainWindow.send('log', `${(percent * 100).toFixed(2)}% downloaded `)
-  mainWindow.send('log', `(${(downloaded / 1024 / 1024).toFixed(2)}MB of ${(total / 1024 / 1024).toFixed(2)}MB)`)
-  mainWindow.send('progress', percent * 100)
+  // mainWindow.send('log', `${(percent * 100).toFixed(2)}% downloaded `)
+  // mainWindow.send('log', `(${(downloaded / 1024 / 1024).toFixed(2)}MB of ${(total / 1024 / 1024).toFixed(2)}MB)`)
+  mainWindow.send('audioProgress', (percent * 100).toFixed(2), `${(downloaded / 1024 / 1024).toFixed(2)}MB of ${(total / 1024 / 1024).toFixed(2)}MB`)
 }
 
-ipcMain.on('download', (event, url) => {
+const onVideoProgress = (chunkLength, downloaded, total) => {
+  const percent = downloaded / total
+  // mainWindow.send('log', `${(percent * 100).toFixed(2)}% downloaded `)
+  // mainWindow.send('log', `(${(downloaded / 1024 / 1024).toFixed(2)}MB of ${(total / 1024 / 1024).toFixed(2)}MB)`)
+  mainWindow.send('videoProgress', (percent * 100).toFixed(2), `${(downloaded / 1024 / 1024).toFixed(2)}MB of ${(total / 1024 / 1024).toFixed(2)}MB`)
+}
+
+// global.audioStream = null
+// global.videoStream = null
+// global.audioFF = null
+// global.videoFF = null
+
+ipcMain.on('download', (event, url, audioOnly) => {
   console.log('downloading track')
-  let title
-  let length_seconds
-  let name
-  let format
-  let bitrate
-  const printDebug = false
 
   ytdl.getInfo(url, (err, info) => {
     if (err) {
       console.log(err)
     } else {
-      mainWindow.send('info', info);
-      // extract info
-      ({ title, length_seconds } = info)
-      name = info.author.name
-      format = ytdl.chooseFormat(info.formats, { quality: 'highestaudio' })
-      bitrate = format.audioBitrate
+      mainWindow.send('info', info)
+      const title = sanitize(info.title)
+      const audioFormat = ytdl.chooseFormat(info.formats, { quality: 'highestaudio' })
+      const audioBitrate = audioFormat.audioBitrate
+      const audioPath = path.join(app.getPath('music'), `${title}.mp3`)
+      const videoFormat = ytdl.chooseFormat(ytdl.filterFormats(info.formats, format => format.container === 'mp4'), { quality: 'highestvideo' }) // && !format.audioEncoding
+      const videoPath = path.join(app.getPath('videos'), `${title}.${videoFormat.container}`)
 
-      // logging
-      if (printDebug) {
-        console.log(info)
-        console.log(`${title} by ${name}`)
-        console.log(`${length_seconds}`)
-        console.log(format)
+      let savePath
+
+      if (audioOnly) {
+        savePath = dialog.showSaveDialogSync({
+          defaultPath: audioPath
+        })
+      } else {
+        savePath = dialog.showSaveDialogSync({
+          defaultPath: videoPath
+        })
       }
 
-      const songDir = dialog.showSaveDialogSync({
-        defaultPath: path.join(app.getPath('music'), `${sanitize(title)}.mp3`)
-      })
-
-      if (songDir !== undefined) {
+      if (savePath !== undefined) {
         // download from info
-        const stream = ytdl.downloadFromInfo(info, {
+        const audioStream = ytdl.downloadFromInfo(info, {
           quality: 'highestaudio'
-        }).on('progress', onProgress)
+        }).on('progress', onAudioProgress)
 
-        ffmpeg(stream)
-          .audioBitrate(bitrate)
-          .save(songDir)
-          .on('end', () => {
-            console.log('\ndone')
-          })
+        if (audioOnly) {
+          ffmpeg(audioStream)
+            .audioBitrate(audioBitrate)
+            .save(savePath)
+            .on('end', () => {
+              console.log('\ndone')
+            })
+        } else {
+          audioStream.pipe(fs.createWriteStream(savePath + '.tmp'))
+            .on('finish', () => {
+              const videoStream = ytdl.downloadFromInfo(info, {
+                quality: 'highestvideo'
+              }).on('progress', onVideoProgress)
+
+              ffmpeg()
+                .input(videoStream)
+                .videoCodec('copy')
+                .input(savePath + '.tmp')
+                .save(savePath)
+                .on('error', console.error)
+                .on('end', () => {
+                  fs.unlink(savePath + '.tmp', err => {
+                    if (err) console.error(err)
+                    else console.log('\ndone')
+                  })
+                })
+            })
+        }
       } else {
-        mainWindow.send('progress', 100)
+        if (audioOnly) {
+          mainWindow.send('audioProgress', 100)
+        } else {
+          mainWindow.send('videoProgress', 100)
+        }
       }
     }
   })
+})
+
+ipcMain.on('cancel', (event) => {
+  console.log('cancel')
+  console.log(global.audioStream)
+  console.log(global.audioFF)
+  if (global.audioStream !== null) {
+    console.log('audio destroy')
+    global.audioStream.destroy()
+  }
+
+  if (global.videoStream !== null) {
+    global.videoStream.destroy()
+  }
+
+  if (global.audioFF !== null) {
+    console.log('audioFF kill')
+    global.audioFF.kill()
+  }
+
+  if (global.videoFF !== null) {
+    global.videoFF.kill()
+  }
 })
