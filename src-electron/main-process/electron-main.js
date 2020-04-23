@@ -45,8 +45,8 @@ function createWindow () {
     if (!fs.existsSync(path.join(app.getAppPath(), '..', '..', 'ffmpeg.exe'))) {
       console.log('copy')
       fs.copyFileSync(path.join(__statics, 'ffmpeg.exe'), path.join(app.getAppPath(), '..', '..', 'ffmpeg.exe'))
-      global.ffmpegPath = path.join(app.getAppPath(), '..', '..', 'ffmpeg.exe')
     }
+    global.ffmpegPath = path.join(app.getAppPath(), '..', '..', 'ffmpeg.exe')
   }
   /*
   else if (process.platform === 'darwin') {

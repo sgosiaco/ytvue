@@ -1,6 +1,6 @@
 {
   "name": "ytvue",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "YT Downloader",
   "productName": "YT Vue",
   "cordovaId": "org.cordova.quasar.app",
