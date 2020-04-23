@@ -32,7 +32,7 @@ function createWindow () {
     webPreferences: {
       // Change from /quasar.conf.js > electron > nodeIntegration;
       // More info: https://quasar.dev/quasar-cli/developing-electron-apps/node-integration
-      nodeIntegration: QUASAR_NODE_INTEGRATION,
+      nodeIntegration: QUASAR_NODE_INTEGRATION
 
       // More info: /quasar-cli/developing-electron-apps/electron-preload-script
       // preload: path.resolve(__dirname, 'electron-preload.js')
@@ -83,6 +83,7 @@ const cancelAll = (err) => {
   if (global.audioStream !== null) {
     console.log('audio destroy')
     global.audioStream.destroy()
+    global.audioStream = null
   }
 
   if (global.videoStream !== null) {
@@ -181,14 +182,14 @@ ipcMain.on('download', (event, url, audioOnly, keepMP3) => {
             // download video too
             global.audioStream.pipe(fs.createWriteStream(global.savePath + '.tmp'))
               .on('finish', () => {
-                const videoStream = ytdl.downloadFromInfo(info, {
+                global.videoStream = ytdl.downloadFromInfo(info, {
                   quality: 'highestvideo'
                 })
                   .on('progress', onVideoProgress)
                   .on('error', cancelAll)
 
                 global.videoFF = ffmpeg()
-                  .input(videoStream)
+                  .input(global.videoStream)
                   .videoCodec('copy')
                   .input(global.savePath + '.tmp')
                   .save(global.savePath)
