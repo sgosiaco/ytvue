@@ -186,11 +186,6 @@ module.exports = function (/* ctx */) {
         appId: 'ytvue',
         win: {
           target: 'nsis'
-        },
-        nsis: {
-          oneClick: false,
-          perMachine: true,
-          allowToChangeInstallationDirectory: true
         }
       },
 
