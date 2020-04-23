@@ -111,12 +111,12 @@ const finish = () => {
   if (fs.existsSync(global.savePath + '.tmp')) {
     fs.unlinkSync(global.savePath + '.tmp')
   }
+  mainWindow.send('ffProgress', true, global.savePath)
   global.audioStream = null
   global.videoStream = null
   global.audioFF = null
   global.videoFF = null
-  global.savePath = null
-  mainWindow.send('ffProgress', true)
+  // global.savePath = null
 }
 
 global.audioStream = null
@@ -139,16 +139,17 @@ ipcMain.on('download', (event, url, audioOnly, keepMP3) => {
       const audioPath = path.join(app.getPath('music'), `${title}`)
       // const videoFormat = ytdl.chooseFormat(ytdl.filterFormats(info.formats, format => format.container === 'mp4'), { quality: 'highestvideo' }) // && !format.audioEncoding
       const videoPath = path.join(app.getPath('videos'), `${title}`) // .${videoFormat.container}
+      let saveDialog
 
       if (audioOnly) {
-        global.savePath = dialog.showSaveDialogSync({
+        saveDialog = dialog.showSaveDialog({
           defaultPath: audioPath,
           filters: [
             { name: '.mp3', extensions: ['mp3'] }
           ]
         })
       } else {
-        global.savePath = dialog.showSaveDialogSync({
+        saveDialog = dialog.showSaveDialog({
           defaultPath: videoPath,
           filters: [
             { name: '.mp4', extensions: ['mp4'] }
@@ -156,57 +157,82 @@ ipcMain.on('download', (event, url, audioOnly, keepMP3) => {
         })
       }
 
-      if (global.savePath !== undefined) {
-        // download from info
-        global.audioStream = ytdl.downloadFromInfo(info, {
-          quality: 'highestaudio'
-        })
-          .on('progress', onAudioProgress)
-          .on('error', cancelAll)
-
-        if (audioOnly) {
-          // save audio
-          global.audioFF = ffmpeg(global.audioStream)
-            .audioBitrate(audioBitrate)
-            .save(global.savePath)
-            .on('error', cancelAll)
-            .on('end', finish)
+      saveDialog.then((object) => {
+        const { canceled, filePath } = object
+        if (canceled) {
+          // canceled
+          mainWindow.send('ffProgress', true)
         } else {
-          // download video too
-          global.audioStream.pipe(fs.createWriteStream(global.savePath + '.tmp'))
-            .on('finish', () => {
-              const videoStream = ytdl.downloadFromInfo(info, {
-                quality: 'highestvideo'
-              })
-                .on('progress', onVideoProgress)
-                .on('error', cancelAll)
+          global.savePath = filePath
+          global.audioStream = ytdl.downloadFromInfo(info, {
+            quality: 'highestaudio'
+          })
+            .on('progress', onAudioProgress)
+            .on('error', cancelAll)
 
-              global.videoFF = ffmpeg()
-                .input(videoStream)
-                .videoCodec('copy')
-                .input(global.savePath + '.tmp')
-                .save(global.savePath)
-                .on('error', cancelAll)
-                .on('end', () => {
-                  if (keepMP3) {
-                    global.audioFF = ffmpeg()
-                      .input(global.savePath + '.tmp')
-                      .audioBitrate(audioBitrate)
-                      .save(global.savePath.split('.mp4')[0] + '.mp3')
-                      .on('error', cancelAll)
-                      .on('end', finish)
-                  } else {
-                    finish()
-                  }
+          if (audioOnly) {
+            // save audio
+            global.audioFF = ffmpeg(global.audioStream)
+              .audioBitrate(audioBitrate)
+              .save(global.savePath)
+              .on('error', cancelAll)
+              .on('end', finish)
+          } else {
+            // download video too
+            global.audioStream.pipe(fs.createWriteStream(global.savePath + '.tmp'))
+              .on('finish', () => {
+                const videoStream = ytdl.downloadFromInfo(info, {
+                  quality: 'highestvideo'
                 })
-            })
+                  .on('progress', onVideoProgress)
+                  .on('error', cancelAll)
+
+                global.videoFF = ffmpeg()
+                  .input(videoStream)
+                  .videoCodec('copy')
+                  .input(global.savePath + '.tmp')
+                  .save(global.savePath)
+                  .on('error', cancelAll)
+                  .on('end', () => {
+                    if (keepMP3) {
+                      global.audioFF = ffmpeg()
+                        .input(global.savePath + '.tmp')
+                        .audioBitrate(audioBitrate)
+                        .save(global.savePath.split('.mp4')[0] + '.mp3')
+                        .on('error', cancelAll)
+                        .on('end', finish)
+                    } else {
+                      finish()
+                    }
+                  })
+              })
+          }
         }
-      } else {
-        // no path selected
-        mainWindow.send('ffProgress', true)
-      }
+      })
     }
   })
 })
 
 ipcMain.on('cancel', cancelAll)
+
+ipcMain.on('openFolder', (event, savePath) => {
+  if (savePath !== undefined) {
+    require('child_process').exec(`start "" "${path.dirname(savePath)}"`)
+  }
+  global.savePath = null
+})
+
+ipcMain.on('deleteTemp', (event) => {
+  console.log(global.savePath)
+  if (fs.existsSync(global.savePath)) {
+    fs.unlinkSync(global.savePath)
+  }
+
+  if (fs.existsSync(global.savePath + '.tmp')) {
+    fs.unlinkSync(global.savePath + '.tmp')
+  }
+
+  if (fs.existsSync(global.savePath.split('.mp4'[0] + '.mp3'))) {
+    fs.unlinkSync(global.savePath.split('.mp4'[0] + '.mp3'))
+  }
+})

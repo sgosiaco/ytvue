@@ -1,11 +1,36 @@
 <template>
   <q-page class="flex flex-center">
-    <div class='q-pa-md'>
-      {{infoLabel}}
+    <q-banner inline-actions="" class="absolute-top" v-if="banner">
+        {{bannerText}}
+        <template v-slot:action>
+          <q-btn flat label="Dismiss" @click="dismiss"/>
+          <q-btn flat label="Open folder" v-if="folderButton" @click="openFolder"/>
+          <q-btn flat label="Delete temp files" v-if="deleteButton" @click="deleteFiles"/>
+        </template>
+    </q-banner>
+    <div class="q-gutter-md column"> <!-- class="q-gutter-md" -->
+      <div class="row fit justify-center">
+        <q-card v-if="loading" style="width: fit-content"> <!--class="q-pa-xs"-->
+          <q-card-section horizontal>
+            <q-card-section>
+              <div class="text">{{info.title}}</div>
+              <div class="text-caption">{{info.author.name}}</div>
+            </q-card-section>
+            <q-card-section>
+              <q-img
+                :src="thumbnail"
+                spinner-color="white"
+                style="height:90px; width:160px"
+                class="rounded-borders"
+              />
+            </q-card-section>
+          </q-card-section>
+        </q-card>
+      </div>
       <div class="q-gutter-md row">
         <q-input
           style="min-width: 500px"
-          class="col"
+          class="float col"
           outlined
           v-model="url"
           type="url"
@@ -25,31 +50,23 @@
           </template>
         </q-btn>
       </div>
-      <div class ="q-gutter-y-md column">
-        <div class="q-gutter-sm">
+      <div class ="column">
+        <div class="q-gutter-x-md" v-if="!loading">
           <q-toggle
             class="float-right col"
             v-model="audioOnly"
             left-label
             label="Audio only"
-            :disable="loading"
           />
           <q-toggle
             class="float-right col"
             v-model="keepMP3"
             left-label
             label="Keep MP3"
-            :disable="loading"
             v-if="!audioOnly"
           />
-          <q-toggle
-            class="float-right col"
-            v-model="loading"
-            left-label
-            label="Load"
-          />
         </div>
-        <div class="q-gutter-md row">
+        <div class="q-gutter-x-md row">
           <div class="flex flex-center col">
             <q-linear-progress class="row" size="25px" :value="percentage/100" color="positive" v-if="percentage > 0 && percentage < 100">
               <div class="absolute-full flex flex-center">
@@ -83,10 +100,11 @@
 export default {
   name: 'PageIndex',
   computed: {
-    infoLabel: {
+    thumbnail: {
       get () {
         if (this.info !== null) {
-          return `Video Info: ${this.info.title} uploaded by ${this.info.author.name}`
+          console.log(`https://img.youtube.com/vi/${this.info.video_id}/hqdefault.jpg.`)
+          return `https://img.youtube.com/vi/${this.info.video_id}/hqdefault.jpg`
         } else {
           return ''
         }
@@ -112,12 +130,23 @@ export default {
       }
     })
 
-    this.$q.electron.ipcRenderer.on('ffProgress', (event, done) => {
+    this.$q.electron.ipcRenderer.on('ffProgress', (event, done, savePath) => {
       if (this.loading && done) {
         this.loading = false
-        this.info = null
+        // this.info = null
         this.percentage = 0
         this.label = ''
+        if (savePath !== undefined) {
+          this.savePath = savePath
+          this.bannerText = `Finished downloading ${this.info.title}`
+          this.folderButton = true
+          this.deleteButton = false
+        } else {
+          this.bannerText = 'Canceled download'
+          this.folderButton = false
+          this.deleteButton = true
+        }
+        this.banner = true
       }
     })
 
@@ -133,6 +162,17 @@ export default {
       if (this.exp.test(this.url)) {
         this.$q.electron.ipcRenderer.send('download', this.url, this.audioOnly, this.keepMP3)
       }
+    },
+    dismiss () {
+      this.banner = false
+    },
+    openFolder () {
+      this.$q.electron.ipcRenderer.send('openFolder', this.savePath)
+      this.banner = false
+    },
+    deleteFiles () {
+      this.$q.electron.ipcRenderer.send('deleteTemp')
+      this.banner = false
     }
   },
   data () {
@@ -144,6 +184,11 @@ export default {
       percentage: 0,
       url: '',
       info: null,
+      savePath: undefined,
+      banner: false,
+      bannerText: '',
+      folderButton: true,
+      deleteButton: false,
       // eslint-disable-next-line no-useless-escape
       exp: RegExp('^(http(s)?:\/\/)?((w){3}.)?youtu(be|.be)?(\.com)?\/.+')
     }
