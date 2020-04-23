@@ -41,6 +41,23 @@ function createWindow () {
 
   mainWindow.loadURL(process.env.APP_URL)
 
+  if (process.platform === 'win32') {
+    if (!fs.existsSync(path.join(app.getAppPath(), '..', '..', 'ffmpeg.exe'))) {
+      console.log('copy')
+      fs.copyFileSync(path.join(__statics, 'ffmpeg.exe'), path.join(app.getAppPath(), '..', '..', 'ffmpeg.exe'))
+      global.ffmpegPath = path.join(app.getAppPath(), '..', '..', 'ffmpeg.exe')
+    }
+  }
+  /*
+  else if (process.platform === 'darwin') {
+    if (!fs.existsSync(path.join(app.getAppPath(), '..', '..', 'ffmpeg'))) {
+      console.log('copy')
+      fs.copyFileSync(path.join(__statics, 'ffmpeg'), path.join(app.getAppPath(), '..', '..', 'ffmpeg'))
+      global.ffmpegPath = path.join(app.getAppPath(), '..', '..', 'ffmpeg')
+    }
+  }
+  */
+
   mainWindow.on('closed', () => {
     mainWindow = null
   })
@@ -78,6 +95,7 @@ const onVideoProgress = (chunkLength, downloaded, total) => {
 
 const cancelAll = (err) => {
   console.error(err)
+  mainWindow.send('log', err)
   console.log('cancel')
 
   if (global.audioStream !== null) {
@@ -120,6 +138,7 @@ const finish = () => {
   // global.savePath = null
 }
 
+global.ffmpegPath = ''
 global.audioStream = null
 global.videoStream = null
 global.audioFF = null
@@ -174,6 +193,7 @@ ipcMain.on('download', (event, url, audioOnly, keepMP3) => {
           if (audioOnly) {
             // save audio
             global.audioFF = ffmpeg(global.audioStream)
+              .setFfmpegPath(global.ffmpegPath)
               .audioBitrate(audioBitrate)
               .save(global.savePath)
               .on('error', cancelAll)
@@ -189,6 +209,7 @@ ipcMain.on('download', (event, url, audioOnly, keepMP3) => {
                   .on('error', cancelAll)
 
                 global.videoFF = ffmpeg()
+                  .setFfmpegPath(global.ffmpegPath)
                   .input(global.videoStream)
                   .videoCodec('copy')
                   .input(global.savePath + '.tmp')
