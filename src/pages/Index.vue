@@ -12,9 +12,10 @@
       <div class="row fit justify-center">
         <q-card v-if="loading" style="width: fit-content"> <!--class="q-pa-xs"-->
           <q-card-section horizontal>
-            <q-card-section>
+            <q-card-section style="max-width: 400px">
               <div class="text">{{info.title}}</div>
               <div class="text-caption">{{info.author.name}}</div>
+              <div class="text-caption">{{uploaded}}</div>
             </q-card-section>
             <q-card-section>
               <q-img
@@ -22,7 +23,11 @@
                 spinner-color="white"
                 style="height:90px; width:160px"
                 class="rounded-borders"
-              />
+              >
+                <div class="fixed-bottom-right transparent">
+                  <q-badge color="black" text-color="white" label="4:03"/>
+                </div>
+              </q-img>
             </q-card-section>
           </q-card-section>
         </q-card>
@@ -92,6 +97,13 @@
           </div>
         </div>
       </div>
+      <q-toggle
+            class="float-right col"
+            v-model="loading"
+            left-label
+            label="Load"
+            v-if="debug"
+          />
     </div>
   </q-page>
 </template>
@@ -100,6 +112,54 @@
 export default {
   name: 'PageIndex',
   computed: {
+    uploaded: {
+      get () {
+        if (this.info !== null) {
+          const now = new Date(Date.now())
+          const upload = new Date(this.info.published) // .toUTCString() // .toDateString()
+          var days = Math.floor((now.getTime() - upload.getTime()) / (1000 * 3600 * 24))
+          console.log(days)
+          var years = 0
+          var months = 0
+          var weeks = 0
+          if (days >= 365) {
+            years = Math.floor(days / 365)
+            days -= years * 365
+          }
+          if (days >= 30) {
+            months = Math.floor(days / 30)
+            days -= months * 30
+          }
+          if (days >= 7) {
+            weeks = Math.floor(days / 7)
+            days -= weeks * 7
+          }
+          if (years !== 0) {
+            if (years === 1) {
+              return '1 year ago'
+            }
+            return `${years} years ago`
+          } else if (months !== 0) {
+            if (months === 1) {
+              return '1 month ago'
+            }
+            return `${months} months ago`
+          } else if (weeks !== 0) {
+            if (weeks === 1) {
+              return '1 week ago'
+            }
+            return `${weeks} weeks ago`
+          } else {
+            if (days === 1) {
+              return '1 day ago'
+            }
+            return `${days} days ago`
+          }
+        } else {
+          return ''
+        }
+      }
+    },
     thumbnail: {
       get () {
         if (this.info !== null) {
@@ -154,6 +214,19 @@ export default {
       this.info = info
     })
   },
+  created: function () {
+    if (this.debug) {
+      this.info = {
+        title: 'BURNOUT SYNDROMES 『PHOENIX』Music Video（TVアニメ「ハイキュー!! TO THE TOP」オープニングテーマ',
+        author: {
+          name: ' BURNOUT SYNDROMES Official YouTube Channel'
+        },
+        video_id: 'b5lsuPxMFmw',
+        length_seconds: 213,
+        published: 1586217600000
+      }
+    }
+  },
   methods: {
     cancel () {
       this.$q.electron.ipcRenderer.send('cancel')
@@ -177,6 +250,7 @@ export default {
   },
   data () {
     return {
+      debug: false,
       audioOnly: true,
       keepMP3: false,
       loading: false,
