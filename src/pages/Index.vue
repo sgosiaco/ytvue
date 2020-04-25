@@ -10,27 +10,7 @@
     </q-banner>
     <div class="q-gutter-md column"> <!-- class="q-gutter-md" -->
       <div class="row fit justify-center">
-        <q-card v-if="loading" style="width: fit-content"> <!--class="q-pa-xs"-->
-          <q-card-section horizontal>
-            <q-card-section style="max-width: 400px">
-              <div class="text">{{info.title}}</div>
-              <div class="text-caption">{{info.author.name}}</div>
-              <div class="text-caption">{{uploaded}}</div>
-            </q-card-section>
-            <q-card-section>
-              <q-img
-                :src="thumbnail"
-                spinner-color="white"
-                style="height:90px; width:160px"
-                class="rounded-borders"
-              >
-                <div class="fixed-bottom-right transparent">
-                  <q-badge color="black" text-color="white" label="4:03"/>
-                </div>
-              </q-img>
-            </q-card-section>
-          </q-card-section>
-        </q-card>
+        <InfoCard :info="info" v-if="loading"></InfoCard>
       </div>
       <div class="q-gutter-md row">
         <q-input
@@ -109,67 +89,14 @@
 </template>
 
 <script>
+import InfoCard from 'components/InfoCard'
+
 export default {
   name: 'PageIndex',
+  components: {
+    InfoCard
+  },
   computed: {
-    uploaded: {
-      get () {
-        if (this.info !== null) {
-          const now = new Date(Date.now())
-          const upload = new Date(this.info.published) // .toUTCString() // .toDateString()
-          var days = Math.floor((now.getTime() - upload.getTime()) / (1000 * 3600 * 24))
-          console.log(days)
-          var years = 0
-          var months = 0
-          var weeks = 0
-          if (days >= 365) {
-            years = Math.floor(days / 365)
-            days -= years * 365
-          }
-          if (days >= 30) {
-            months = Math.floor(days / 30)
-            days -= months * 30
-          }
-          if (days >= 7) {
-            weeks = Math.floor(days / 7)
-            days -= weeks * 7
-          }
-          if (years !== 0) {
-            if (years === 1) {
-              return '1 year ago'
-            }
-            return `${years} years ago`
-          } else if (months !== 0) {
-            if (months === 1) {
-              return '1 month ago'
-            }
-            return `${months} months ago`
-          } else if (weeks !== 0) {
-            if (weeks === 1) {
-              return '1 week ago'
-            }
-            return `${weeks} weeks ago`
-          } else {
-            if (days === 1) {
-              return '1 day ago'
-            }
-            return `${days} days ago`
-          }
-        } else {
-          return ''
-        }
-      }
-    },
-    thumbnail: {
-      get () {
-        if (this.info !== null) {
-          console.log(`https://img.youtube.com/vi/${this.info.video_id}/hqdefault.jpg.`)
-          return `https://img.youtube.com/vi/${this.info.video_id}/hqdefault.jpg`
-        } else {
-          return ''
-        }
-      }
-    },
     ffLabel: {
       get () {
         return `Processing ${this.label.split(':')[0].toLowerCase()}...`
