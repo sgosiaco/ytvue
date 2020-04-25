@@ -10,7 +10,7 @@
     </q-banner>
     <div class="q-gutter-md column"> <!-- class="q-gutter-md" -->
       <div class="row fit justify-center">
-        <InfoCard :info="info" v-if="loading"></InfoCard>
+        <InfoCard v-for="bar in bars" v-bind="bar" :key="bar.url"></InfoCard>
       </div>
       <div class="q-gutter-md row">
         <q-input
@@ -21,14 +21,12 @@
           type="url"
           label="Youtube link"
           :rules="[val => this.exp.test(val) || 'Please enter valid youtube link']"
-          :disable="downloadDisable"
         />
         <q-btn
           style="height: 55px; width: 150px"
           class="col"
           :loading="loading"
           color="primary"
-          :disable="downloadDisable"
           @click="download()"
         >
           Download
@@ -44,6 +42,7 @@
             v-model="audioOnly"
             left-label
             label="Audio only"
+            :disable="downloadDisable"
           />
           <q-toggle
             class="float-right col"
@@ -51,33 +50,10 @@
             left-label
             label="Keep MP3"
             v-if="!audioOnly"
+            :disable="downloadDisable"
           />
         </div>
-        <div class="q-gutter-x-md row">
-          <div class="flex flex-center col">
-            <q-linear-progress class="row" size="25px" :value="percentage/100" color="positive" v-if="percentage > 0 && percentage < 100">
-              <div class="absolute-full flex flex-center">
-                <q-badge color="transparent" text-color="white" :label="label"/>
-              </div>
-            </q-linear-progress>
-            <q-linear-progress class="row" size="25px" color="primary" indeterminate v-if="loading">
-              <div class="absolute-full flex flex-center">
-                <q-badge color="transparent" text-color="white" :label="ffLabel"/>
-              </div>
-            </q-linear-progress>
-          </div>
-          <div class="flex flex-center float-right">
-            <q-btn
-              style="max-width: 70px; max-height: 35px"
-              class="col"
-              color="negative"
-              @click="cancel()"
-              v-if="loading"
-            >
-              Cancel
-            </q-btn>
-          </div>
-        </div>
+        <LoadingBars v-for="bar in bars" v-bind="bar" :key="bar.url"></LoadingBars>
       </div>
       <q-toggle
             class="float-right col"
@@ -92,41 +68,39 @@
 
 <script>
 import InfoCard from 'components/InfoCard'
+import LoadingBars from 'components/LoadingBars'
 
 export default {
   name: 'PageIndex',
   components: {
-    InfoCard
-  },
-  computed: {
-    ffLabel: {
-      get () {
-        return `Processing ${this.label.split(':')[0].toLowerCase()}...`
-      }
-    }
+    InfoCard,
+    LoadingBars
   },
   beforeCreate: function () {
-    this.$q.electron.ipcRenderer.on('progress', (event, percent, label) => {
-      this.percentage = percent
-      this.label = label
-      if (!this.loading) {
-        this.loading = percent > 0
+    this.$q.electron.ipcRenderer.on('progress', (event, percent, label, url) => {
+      var bar = this.bars.filter(it => it.url === url)[0]
+      var index = this.bars.indexOf(bar)
+      bar.percentage = percent
+      bar.label = label
+      if (!bar.loading) {
+        bar.loading = percent > 0
       } else {
         if (percent >= 100) {
-          this.percentage = 0
-          this.label = ''
+          bar.percentage = '0'
+          bar.label = ''
         }
       }
+      this.$set(this.bars, index, bar)
     })
 
-    this.$q.electron.ipcRenderer.on('ffProgress', (event, done, savePath) => {
-      if (this.loading && done) {
-        this.loading = false
+    this.$q.electron.ipcRenderer.on('ffProgress', (event, done, savePath, url) => {
+      var bar = this.bars.filter(it => it.url === url)[0]
+      if (bar.loading && done) {
+        bar.loading = false
         this.downloadDisable = false
-        // this.info = null
-        this.percentage = 0
-        this.label = ''
-        if (savePath !== undefined) {
+        bar.percentage = '0'
+        bar.label = ''
+        if (savePath !== null) {
           this.savePath = savePath
           this.bannerText = `Finished downloading ${this.info.title}`
           this.folderButton = true
@@ -137,11 +111,15 @@ export default {
           this.deleteButton = true
         }
         this.banner = true
+        this.bars = this.bars.filter(it => it.url !== url)
       }
     })
 
-    this.$q.electron.ipcRenderer.on('info', (event, info) => {
-      this.info = info
+    this.$q.electron.ipcRenderer.on('info', (event, info, url) => {
+      var bar = this.bars.filter(it => it.url === url)[0]
+      var index = this.bars.indexOf(bar)
+      bar.info = info
+      this.$set(this.bars, index, bar)
     })
   },
   created: function () {
@@ -158,24 +136,27 @@ export default {
     }
   },
   methods: {
-    cancel () {
-      this.$q.electron.ipcRenderer.send('cancel')
-    },
     download () {
       if (this.exp.test(this.url)) {
         this.$q.electron.ipcRenderer.send('download', this.url, this.audioOnly, this.keepMP3)
         this.downloadDisable = true
+        this.bars.push({
+          url: this.url,
+          label: '',
+          percentage: '0',
+          loading: false
+        })
       }
     },
     dismiss () {
       this.banner = false
     },
     openFolder () {
-      this.$q.electron.ipcRenderer.send('openFolder', this.savePath)
+      this.$q.electron.ipcRenderer.send('openFolder', this.savePath, this.url)
       this.banner = false
     },
     deleteFiles () {
-      this.$q.electron.ipcRenderer.send('deleteTemp')
+      this.$q.electron.ipcRenderer.send('deleteTemp', this.url)
       this.banner = false
     }
   },
@@ -186,10 +167,8 @@ export default {
       keepMP3: false,
       loading: false,
       downloadDisable: false,
-      label: '',
-      percentage: 0,
+      bars: [],
       url: '',
-      info: null,
       savePath: undefined,
       banner: false,
       bannerText: '',

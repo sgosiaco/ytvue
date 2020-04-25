@@ -83,67 +83,62 @@ const fs = require('fs')
 const path = require('path')
 const sanitize = require('sanitize-filename')
 
-const onAudioProgress = (chunkLength, downloaded, total) => {
+const onAudioProgress = (chunkLength, downloaded, total, url) => {
   const percent = downloaded / total
-  mainWindow.send('progress', (percent * 100).toFixed(2), `Audio: ${(downloaded / 1024 / 1024).toFixed(2)}MB of ${(total / 1024 / 1024).toFixed(2)}MB`)
+  mainWindow.send('progress', (percent * 100).toFixed(2), `Audio: ${(downloaded / 1024 / 1024).toFixed(2)}MB of ${(total / 1024 / 1024).toFixed(2)}MB`, url)
 }
 
-const onVideoProgress = (chunkLength, downloaded, total) => {
+const onVideoProgress = (chunkLength, downloaded, total, url) => {
   const percent = downloaded / total
-  mainWindow.send('progress', (percent * 100).toFixed(2), `Video: ${(downloaded / 1024 / 1024).toFixed(2)}MB of ${(total / 1024 / 1024).toFixed(2)}MB`)
+  mainWindow.send('progress', (percent * 100).toFixed(2), `Video: ${(downloaded / 1024 / 1024).toFixed(2)}MB of ${(total / 1024 / 1024).toFixed(2)}MB`, url)
 }
 
-const cancelAll = (err) => {
-  console.error(err)
-  mainWindow.send('log', err)
+const cancelAll = (url) => {
+  var proc = processes.get(url)
   console.log('cancel')
 
-  if (global.audioStream !== null) {
+  if (proc.audioStream !== undefined) {
     console.log('audio destroy')
-    global.audioStream.destroy()
-    global.audioStream = null
+    proc.audioStream.destroy()
+    proc.audioStream = undefined
   }
 
-  if (global.videoStream !== null) {
+  if (proc.videoStream !== undefined) {
     console.log('video destroy')
-    global.videoStream.destroy()
-    global.videoStream = null
+    proc.videoStream.destroy()
+    proc.videoStream = undefined
   }
 
-  if (global.audioFF !== null) {
+  if (proc.audioFF !== undefined) {
     console.log('audioFF kill')
-    global.audioFF.kill()
-    global.audioFF = null
+    proc.audioFF.kill()
+    proc.audioFF = undefined
   }
 
-  if (global.videoFF !== null) {
+  if (proc.videoFF !== undefined) {
     console.log('videoFF kill')
-    global.videoFF.kill()
-    global.videoFF = null
+    proc.videoFF.kill()
+    proc.videoFF = undefined
   }
-
-  mainWindow.send('ffProgress', true)
+  // processes.delete(url)  can't delete cause need for delete temp but need to delete incase of actual error!!
+  mainWindow.send('ffProgress', true, null, url)
 }
 
-const finish = () => {
+const finish = (url) => {
+  var proc = processes.get(url)
   console.log('\ndone')
-  if (fs.existsSync(global.savePath + '.tmp')) {
-    fs.unlinkSync(global.savePath + '.tmp')
+  if (fs.existsSync(proc.savePath + '.tmp')) {
+    fs.unlinkSync(proc.savePath + '.tmp')
   }
-  mainWindow.send('ffProgress', true, global.savePath)
-  global.audioStream = null
-  global.videoStream = null
-  global.audioFF = null
-  global.videoFF = null
-  // global.savePath = null
+  mainWindow.send('ffProgress', true, proc.savePath, url)
+  proc.audioStream = undefined
+  proc.videoStream = undefined
+  proc.audioFF = undefined
+  proc.videoFF = undefined
+  processes.delete(url)
 }
 
-global.ffmpegPath = ''
-global.audioStream = null
-global.videoStream = null
-global.audioFF = null
-global.videoFF = null
-global.savePath = null
+var processes = new Map()
 
 ipcMain.on('download', (event, url, audioOnly, keepMP3) => {
   console.log('downloading track')
@@ -152,7 +147,7 @@ ipcMain.on('download', (event, url, audioOnly, keepMP3) => {
     if (err) {
       cancelAll(err)
     } else {
-      mainWindow.send('info', info)
+      mainWindow.send('info', info, url)
       const title = sanitize(info.title)
       const audioFormat = ytdl.chooseFormat(info.formats, { quality: 'highestaudio' })
       const audioBitrate = audioFormat.audioBitrate
@@ -176,85 +171,113 @@ ipcMain.on('download', (event, url, audioOnly, keepMP3) => {
           ]
         })
       }
-
       saveDialog.then((object) => {
         const { canceled, filePath } = object
         if (canceled) {
           // canceled
-          mainWindow.send('ffProgress', true)
+          mainWindow.send('ffProgress', true, null, url)
         } else {
-          global.savePath = filePath
-          global.audioStream = ytdl.downloadFromInfo(info, {
+          var proc = {}
+          proc.savePath = filePath
+          proc.audioStream = ytdl.downloadFromInfo(info, {
             quality: 'highestaudio'
           })
-            .on('progress', onAudioProgress)
-            .on('error', cancelAll)
+            .on('progress', (chunkLength, downloaded, total) => {
+              onAudioProgress(chunkLength, downloaded, total, url)
+            })
+            .on('error', (error) => {
+              console.log(error)
+              cancelAll(url)
+            })
 
           if (audioOnly) {
             // save audio
-            global.audioFF = ffmpeg(global.audioStream)
+            proc.audioFF = ffmpeg(proc.audioStream)
               .setFfmpegPath(global.ffmpegPath)
               .audioBitrate(audioBitrate)
-              .save(global.savePath)
-              .on('error', cancelAll)
-              .on('end', finish)
+              .save(proc.savePath)
+              .on('error', (error) => {
+                console.log(error)
+                cancelAll(url)
+              })
+              .on('end', () => {
+                finish(url)
+              })
           } else {
             // download video too
-            global.audioStream.pipe(fs.createWriteStream(global.savePath + '.tmp'))
+            proc.audioStream.pipe(fs.createWriteStream(proc.savePath + '.tmp'))
               .on('finish', () => {
-                global.videoStream = ytdl.downloadFromInfo(info, {
+                proc.videoStream = ytdl.downloadFromInfo(info, {
                   quality: 'highestvideo'
                 })
-                  .on('progress', onVideoProgress)
-                  .on('error', cancelAll)
+                  .on('progress', (chunkLength, downloaded, total) => {
+                    onVideoProgress(chunkLength, downloaded, total, url)
+                  })
+                  .on('error', (error) => {
+                    console.log(error)
+                    cancelAll(url)
+                  })
 
-                global.videoFF = ffmpeg()
+                proc.videoFF = ffmpeg()
                   .setFfmpegPath(global.ffmpegPath)
-                  .input(global.videoStream)
+                  .input(proc.videoStream)
                   .videoCodec('copy')
-                  .input(global.savePath + '.tmp')
-                  .save(global.savePath)
-                  .on('error', cancelAll)
+                  .input(proc.savePath + '.tmp')
+                  .save(proc.savePath)
+                  .on('error', (error) => {
+                    console.log(error)
+                    cancelAll(url)
+                  })
                   .on('end', () => {
                     if (keepMP3) {
-                      global.audioFF = ffmpeg()
-                        .input(global.savePath + '.tmp')
+                      proc.audioFF = ffmpeg()
+                        .input(proc.savePath + '.tmp')
                         .audioBitrate(audioBitrate)
-                        .save(global.savePath.split('.mp4')[0] + '.mp3')
-                        .on('error', cancelAll)
-                        .on('end', finish)
+                        .save(proc.savePath.split('.mp4')[0] + '.mp3')
+                        .on('error', (error) => {
+                          console.log(error)
+                          cancelAll(url)
+                        })
+                        .on('end', () => {
+                          finish(url)
+                        })
                     } else {
-                      finish()
+                      finish(url)
                     }
                   })
               })
           }
+          processes.set(url, proc)
         }
       })
     }
   })
 })
 
-ipcMain.on('cancel', cancelAll)
+ipcMain.on('cancel', (event, url) => {
+  console.log(url)
+  cancelAll(url)
+})
 
-ipcMain.on('openFolder', (event, savePath) => {
+ipcMain.on('openFolder', (event, savePath, url) => {
   if (savePath !== undefined) {
     require('child_process').exec(`start "" "${path.dirname(savePath)}"`)
   }
-  global.savePath = null
+  // global.savePath = null
 })
 
-ipcMain.on('deleteTemp', (event) => {
-  console.log(global.savePath)
-  if (fs.existsSync(global.savePath)) {
-    fs.unlinkSync(global.savePath)
+ipcMain.on('deleteTemp', (event, url) => {
+  var proc = processes.get(url)
+  console.log(proc.savePath)
+  if (fs.existsSync(proc.savePath)) {
+    fs.unlinkSync(proc.savePath)
   }
 
-  if (fs.existsSync(global.savePath + '.tmp')) {
-    fs.unlinkSync(global.savePath + '.tmp')
+  if (fs.existsSync(proc.savePath + '.tmp')) {
+    fs.unlinkSync(proc.savePath + '.tmp')
   }
 
-  if (fs.existsSync(global.savePath.split('.mp4'[0] + '.mp3'))) {
-    fs.unlinkSync(global.savePath.split('.mp4'[0] + '.mp3'))
+  if (fs.existsSync(proc.savePath.split('.mp4'[0] + '.mp3'))) {
+    fs.unlinkSync(proc.savePath.split('.mp4'[0] + '.mp3'))
   }
 })

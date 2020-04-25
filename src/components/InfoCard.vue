@@ -1,5 +1,5 @@
 <template>
-  <q-card style="width: fit-content"> <!--class="q-pa-xs"-->
+  <q-card style="width: fit-content" v-if="loading"> <!--class="q-pa-xs"-->
     <q-card-section horizontal>
       <q-card-section style="max-width: 400px">
         <div class="text">{{localInfo.title}}</div>
@@ -29,20 +29,16 @@ export default {
     info: {
       type: Object,
       required: true
+    },
+    loading: {
+      type: Boolean,
+      required: true
     }
   },
   computed: {
     localInfo: {
       get () {
-        return this.info ? this.info : {
-          title: 'BURNOUT SYNDROMES 『PHOENIX』Music Video（TVアニメ「ハイキュー!! TO THE TOP」オープニングテーマ',
-          author: {
-            name: ' BURNOUT SYNDROMES Official YouTube Channel'
-          },
-          video_id: 'b5lsuPxMFmw',
-          length_seconds: 213,
-          published: 1586217600000
-        }
+        return this.info
       }
     },
     thumbnail: {
