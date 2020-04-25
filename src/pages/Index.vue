@@ -21,12 +21,14 @@
           type="url"
           label="Youtube link"
           :rules="[val => this.exp.test(val) || 'Please enter valid youtube link']"
+          :disable="downloadDisable"
         />
         <q-btn
           style="height: 55px; width: 150px"
           class="col"
           :loading="loading"
           color="primary"
+          :disable="downloadDisable"
           @click="download()"
         >
           Download
@@ -120,6 +122,7 @@ export default {
     this.$q.electron.ipcRenderer.on('ffProgress', (event, done, savePath) => {
       if (this.loading && done) {
         this.loading = false
+        this.downloadDisable = false
         // this.info = null
         this.percentage = 0
         this.label = ''
@@ -161,6 +164,7 @@ export default {
     download () {
       if (this.exp.test(this.url)) {
         this.$q.electron.ipcRenderer.send('download', this.url, this.audioOnly, this.keepMP3)
+        this.downloadDisable = true
       }
     },
     dismiss () {
@@ -181,6 +185,7 @@ export default {
       audioOnly: true,
       keepMP3: false,
       loading: false,
+      downloadDisable: false,
       label: '',
       percentage: 0,
       url: '',
