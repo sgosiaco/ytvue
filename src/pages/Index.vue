@@ -9,7 +9,7 @@
         </template>
     </q-banner>
     <div class="q-gutter-md column"> <!-- class="q-gutter-md" -->
-      <div class="row fit justify-center">
+      <div class="q-gutter-y-md row fit justify-center">
         <InfoCard v-for="bar in bars" v-bind="bar" :key="bar.url"></InfoCard>
       </div>
       <div class="q-gutter-md row">
@@ -53,7 +53,9 @@
             :disable="downloadDisable"
           />
         </div>
-        <LoadingBars v-for="bar in bars" v-bind="bar" :key="bar.url"></LoadingBars>
+        <div class="q-gutter-y-md">
+          <LoadingBars v-for="bar in bars" v-bind="bar" :key="bar.url"></LoadingBars>
+        </div>
       </div>
       <q-toggle
             class="float-right col"
@@ -124,15 +126,38 @@ export default {
   },
   created: function () {
     if (this.debug) {
-      this.info = {
-        title: 'BURNOUT SYNDROMES 『PHOENIX』Music Video（TVアニメ「ハイキュー!! TO THE TOP」オープニングテーマ',
-        author: {
-          name: ' BURNOUT SYNDROMES Official YouTube Channel'
+      this.bars = [
+        {
+          url: 'https://youtube.com/something1',
+          label: '',
+          percentage: '0',
+          loading: true,
+          info: {
+            title: 'BURNOUT SYNDROMES 『PHOENIX』Music Video（TVアニメ「ハイキュー!! TO THE TOP」オープニングテーマ',
+            author: {
+              name: ' BURNOUT SYNDROMES Official YouTube Channel'
+            },
+            video_id: 'b5lsuPxMFmw',
+            length_seconds: 213,
+            published: 1586217600000
+          }
         },
-        video_id: 'b5lsuPxMFmw',
-        length_seconds: 213,
-        published: 1586217600000
-      }
+        {
+          url: 'https://youtube.com/something2',
+          label: '',
+          percentage: '0',
+          loading: true,
+          info: {
+            title: 'BURNOUT SYNDROMES 『PHOENIX』Music Video（TVアニメ「ハイキュー!! TO THE TOP」オープニングテーマ',
+            author: {
+              name: ' BURNOUT SYNDROMES Official YouTube Channel'
+            },
+            video_id: 'b5lsuPxMFmw',
+            length_seconds: 213,
+            published: 1586217600000
+          }
+        }
+      ]
     }
   },
   methods: {

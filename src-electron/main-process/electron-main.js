@@ -263,7 +263,6 @@ ipcMain.on('openFolder', (event, savePath, url) => {
   if (savePath !== undefined) {
     require('child_process').exec(`start "" "${path.dirname(savePath)}"`)
   }
-  // global.savePath = null
 })
 
 ipcMain.on('deleteTemp', (event, url) => {

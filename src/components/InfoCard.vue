@@ -51,39 +51,34 @@ export default {
         const now = new Date(Date.now())
         const upload = new Date(this.localInfo.published) // .toUTCString() // .toDateString()
         var days = Math.floor((now.getTime() - upload.getTime()) / (1000 * 3600 * 24))
-        if (days >= 365) {
-          var years = Math.floor(days / 365)
-          if (years === 1) {
-            return '1 year ago'
+        const vals = [{ time: 365, str: 'year' }, { time: 30, str: 'month' }, { time: 7, str: 'week' }, { time: 1, str: 'day' }]
+        for (const value of vals) {
+          if (days >= value.time) {
+            var time = Math.floor(days / value.time)
+            if (time === 1) {
+              return `1 ${value.str} ago`
+            }
+            return `${time} ${value.str}s ago`
           }
-          return `${years} years ago`
-        } else if (days >= 30) {
-          var months = Math.floor(days / 30)
-          if (months === 1) {
-            return '1 month ago'
-          }
-          return `${months} months ago`
-        } else if (days >= 7) {
-          var weeks = Math.floor(days / 7)
-          days -= weeks * 7
-          if (weeks === 1) {
-            return '1 week ago'
-          }
-          return `${weeks} weeks ago`
         }
-        if (days === 1) {
-          return '1 day ago'
-        }
-        return `${days} days ago`
+        return ''
       }
     },
     duration: {
       get () {
         var seconds = this.localInfo.length_seconds
-        var minutes = 0
-        var hours = 0
         var output = ''
-
+        const vals = [3600, 60]
+        vals.forEach((value, index) => {
+          if (seconds >= value) {
+            var time = Math.floor(seconds / value)
+            seconds -= time * value
+            output += output === '' ? `${time}:` : `${time.toString().padStart(2, '0')}:`
+          }
+        })
+        output += output === '' ? `0:${seconds.toString().padStart(2, '0')}` : `${seconds.toString().padStart(2, '0')}`
+        return output
+        /*
         if (seconds >= 3600) {
           hours = Math.floor(seconds / 3600)
           seconds -= hours * 3600
@@ -102,6 +97,7 @@ export default {
         }
         output += `${seconds.toString().padStart(2, '0')}`
         return output
+        */
       }
     }
   },
