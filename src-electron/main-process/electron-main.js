@@ -131,6 +131,7 @@ const finish = (url) => {
     fs.unlinkSync(proc.savePath + '.tmp')
   }
   mainWindow.send('ffProgress', true, proc.savePath, url)
+  console.log(`Sent: ffProgress, true, ${proc.savePath}, ${url}`)
   proc.audioStream = undefined
   proc.videoStream = undefined
   proc.audioFF = undefined
@@ -143,114 +144,116 @@ var processes = new Map()
 ipcMain.on('download', (event, url, audioOnly, keepMP3) => {
   console.log('downloading track')
 
-  ytdl.getInfo(url, (err, info) => {
-    if (err) {
-      cancelAll(err)
-    } else {
-      mainWindow.send('info', info, url)
-      const title = sanitize(info.title)
-      const audioFormat = ytdl.chooseFormat(info.formats, { quality: 'highestaudio' })
-      const audioBitrate = audioFormat.audioBitrate
-      const audioPath = path.join(app.getPath('music'), `${title}`)
-      // const videoFormat = ytdl.chooseFormat(ytdl.filterFormats(info.formats, format => format.container === 'mp4'), { quality: 'highestvideo' }) // && !format.audioEncoding
-      const videoPath = path.join(app.getPath('videos'), `${title}`) // .${videoFormat.container}
-      let saveDialog
+  ytdl.getInfo(url).then(info => {
+    console.log('sending info to window')
+    mainWindow.send('info', info, url)
+    const title = sanitize(info.videoDetails.title)
+    const audioFormat = ytdl.chooseFormat(info.formats, { quality: 'highestaudio' })
+    const audioBitrate = audioFormat.audioBitrate
+    const audioPath = path.join(app.getPath('music'), `${title}`)
+    // const videoFormat = ytdl.chooseFormat(ytdl.filterFormats(info.formats, format => format.container === 'mp4'), { quality: 'highestvideo' }) // && !format.audioEncoding
+    const videoPath = path.join(app.getPath('videos'), `${title}`) // .${videoFormat.container}
+    let saveDialog
 
-      if (audioOnly) {
-        saveDialog = dialog.showSaveDialog({
-          defaultPath: audioPath,
-          filters: [
-            { name: '.mp3', extensions: ['mp3'] }
-          ]
-        })
+    if (audioOnly) {
+      saveDialog = dialog.showSaveDialog({
+        defaultPath: audioPath,
+        filters: [
+          { name: '.mp3', extensions: ['mp3'] }
+        ]
+      })
+    } else {
+      saveDialog = dialog.showSaveDialog({
+        defaultPath: videoPath,
+        filters: [
+          { name: '.mp4', extensions: ['mp4'] }
+        ]
+      })
+    }
+    saveDialog.then((object) => {
+      const { canceled, filePath } = object
+      if (canceled) {
+        // canceled
+        mainWindow.send('ffProgress', true, null, url)
       } else {
-        saveDialog = dialog.showSaveDialog({
-          defaultPath: videoPath,
-          filters: [
-            { name: '.mp4', extensions: ['mp4'] }
-          ]
+        var proc = {}
+        proc.savePath = filePath
+        proc.audioStream = ytdl.downloadFromInfo(info, {
+          quality: 'highestaudio'
         })
-      }
-      saveDialog.then((object) => {
-        const { canceled, filePath } = object
-        if (canceled) {
-          // canceled
-          mainWindow.send('ffProgress', true, null, url)
-        } else {
-          var proc = {}
-          proc.savePath = filePath
-          proc.audioStream = ytdl.downloadFromInfo(info, {
-            quality: 'highestaudio'
+          .on('progress', (chunkLength, downloaded, total) => {
+            onAudioProgress(chunkLength, downloaded, total, url)
           })
-            .on('progress', (chunkLength, downloaded, total) => {
-              onAudioProgress(chunkLength, downloaded, total, url)
-            })
+          .on('error', (error) => {
+            console.log(error)
+            cancelAll(url)
+          })
+
+        if (audioOnly) {
+          // save audio
+          proc.audioFF = ffmpeg(proc.audioStream)
+            .setFfmpegPath(global.ffmpegPath)
+            .audioBitrate(audioBitrate)
+            .save(proc.savePath)
             .on('error', (error) => {
               console.log(error)
               cancelAll(url)
             })
-
-          if (audioOnly) {
-            // save audio
-            proc.audioFF = ffmpeg(proc.audioStream)
-              .setFfmpegPath(global.ffmpegPath)
-              .audioBitrate(audioBitrate)
-              .save(proc.savePath)
-              .on('error', (error) => {
-                console.log(error)
-                cancelAll(url)
+            .on('end', () => {
+              finish(url)
+            })
+        } else {
+          // download video too
+          proc.audioStream.pipe(fs.createWriteStream(proc.savePath + '.tmp'))
+            .on('finish', () => {
+              proc.videoStream = ytdl.downloadFromInfo(info, {
+                quality: 'highestvideo'
               })
-              .on('end', () => {
-                finish(url)
-              })
-          } else {
-            // download video too
-            proc.audioStream.pipe(fs.createWriteStream(proc.savePath + '.tmp'))
-              .on('finish', () => {
-                proc.videoStream = ytdl.downloadFromInfo(info, {
-                  quality: 'highestvideo'
+                .on('progress', (chunkLength, downloaded, total) => {
+                  onVideoProgress(chunkLength, downloaded, total, url)
                 })
-                  .on('progress', (chunkLength, downloaded, total) => {
-                    onVideoProgress(chunkLength, downloaded, total, url)
-                  })
-                  .on('error', (error) => {
-                    console.log(error)
-                    cancelAll(url)
-                  })
+                .on('error', (error) => {
+                  console.log(error)
+                  cancelAll(url)
+                })
 
-                proc.videoFF = ffmpeg()
-                  .setFfmpegPath(global.ffmpegPath)
-                  .input(proc.videoStream)
-                  .videoCodec('copy')
-                  .input(proc.savePath + '.tmp')
-                  .save(proc.savePath)
-                  .on('error', (error) => {
-                    console.log(error)
-                    cancelAll(url)
-                  })
-                  .on('end', () => {
-                    if (keepMP3) {
-                      proc.audioFF = ffmpeg()
-                        .input(proc.savePath + '.tmp')
-                        .audioBitrate(audioBitrate)
-                        .save(proc.savePath.split('.mp4')[0] + '.mp3')
-                        .on('error', (error) => {
-                          console.log(error)
-                          cancelAll(url)
-                        })
-                        .on('end', () => {
-                          finish(url)
-                        })
-                    } else {
-                      finish(url)
-                    }
-                  })
-              })
-          }
-          processes.set(url, proc)
+              proc.videoFF = ffmpeg()
+                .setFfmpegPath(global.ffmpegPath)
+                .input(proc.videoStream)
+                .videoCodec('copy')
+                .input(proc.savePath + '.tmp')
+                .save(proc.savePath)
+                .on('error', (error) => {
+                  console.log(error)
+                  cancelAll(url)
+                })
+                .on('end', () => {
+                  if (keepMP3) {
+                    proc.audioFF = ffmpeg()
+                      .input(proc.savePath + '.tmp')
+                      .audioBitrate(audioBitrate)
+                      .save(proc.savePath.split('.mp4')[0] + '.mp3')
+                      .on('error', (error) => {
+                        console.log(error)
+                        cancelAll(url)
+                      })
+                      .on('end', () => {
+                        finish(url)
+                      })
+                  } else {
+                    finish(url)
+                  }
+                })
+            })
         }
-      })
-    }
+        processes.set(url, proc)
+      }
+    }).catch((error) => {
+      console.error(error)
+    })
+  }).catch(err => {
+    console.error(err)
+    cancelAll(err)
   })
 })
 

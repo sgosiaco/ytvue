@@ -5,7 +5,7 @@
         <template v-slot:action>
           <q-btn flat label="Dismiss" @click="dismiss"/>
           <q-btn flat label="Open folder" v-if="folderButton" @click="openFolder"/>
-          <q-btn flat label="Delete temp files" v-if="deleteButton" @click="deleteFiles"/>
+          <q-btn flat label="Delete temp files" v-else @click="deleteFiles"/>
         </template>
     </q-banner>
     <div class="q-gutter-md column"> <!-- class="q-gutter-md" -->
@@ -96,6 +96,7 @@ export default {
     })
 
     this.$q.electron.ipcRenderer.on('ffProgress', (event, done, savePath, url) => {
+      console.log(`Received: ffProgress, ${done}, ${savePath}, ${url}`)
       var bar = this.bars.filter(it => it.url === url)[0]
       if (bar.loading && done) {
         bar.loading = false
@@ -106,11 +107,9 @@ export default {
           this.savePath = savePath
           this.bannerText = `Finished downloading ${this.info.title}`
           this.folderButton = true
-          this.deleteButton = false
         } else {
           this.bannerText = 'Canceled download'
           this.folderButton = false
-          this.deleteButton = true
         }
         this.banner = true
         this.bars = this.bars.filter(it => it.url !== url)
@@ -118,6 +117,7 @@ export default {
     })
 
     this.$q.electron.ipcRenderer.on('info', (event, info, url) => {
+      console.log(`Received ${info}`)
       var bar = this.bars.filter(it => it.url === url)[0]
       var index = this.bars.indexOf(bar)
       bar.info = info
@@ -164,6 +164,7 @@ export default {
     download () {
       if (this.exp.test(this.url)) {
         this.$q.electron.ipcRenderer.send('download', this.url, this.audioOnly, this.keepMP3)
+        console.log(`Sent: download, ${this.url}, ${this.audioOnly}, ${this.keepMP3}`)
         this.downloadDisable = true
         this.bars.push({
           url: this.url,
@@ -178,10 +179,12 @@ export default {
     },
     openFolder () {
       this.$q.electron.ipcRenderer.send('openFolder', this.savePath, this.url)
+      console.log(`Sent: openFolder, ${this.savePath}, ${this.url}`)
       this.banner = false
     },
     deleteFiles () {
       this.$q.electron.ipcRenderer.send('deleteTemp', this.url)
+      console.log(`Sent: deleteTemp, ${this.url}`)
       this.banner = false
     }
   },
@@ -198,7 +201,6 @@ export default {
       banner: false,
       bannerText: '',
       folderButton: true,
-      deleteButton: false,
       // eslint-disable-next-line no-useless-escape
       exp: RegExp('^(http(s)?:\/\/)?((w){3}.)?youtu(be|.be)?(\.com)?\/.+')
     }

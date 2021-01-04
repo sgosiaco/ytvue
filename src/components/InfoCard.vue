@@ -2,8 +2,8 @@
   <q-card style="width: fit-content" v-if="loading"> <!--class="q-pa-xs"-->
     <q-card-section horizontal>
       <q-card-section style="max-width: 400px">
-        <div class="text">{{localInfo.title}}</div>
-        <div class="text-caption">{{localInfo.author.name}}</div>
+        <div class="text">{{localInfo.videoDetails.title}}</div>
+        <div class="text-caption">{{localInfo.videoDetails.author.name}}</div>
         <div class="text-caption">{{uploaded}}</div>
       </q-card-section>
       <q-card-section>
@@ -43,22 +43,19 @@ export default {
     },
     thumbnail: {
       get () {
-        return `https://img.youtube.com/vi/${this.localInfo.video_id}/hqdefault.jpg`
+        return `https://img.youtube.com/vi/${this.localInfo.videoDetails.videoId}/hqdefault.jpg`
       }
     },
     uploaded: {
       get () {
         const now = new Date(Date.now())
-        const upload = new Date(this.localInfo.published) // .toUTCString() // .toDateString()
+        const upload = new Date(this.localInfo.videoDetails.published) // .toUTCString() // .toDateString()
         var days = Math.floor((now.getTime() - upload.getTime()) / (1000 * 3600 * 24))
         const vals = [{ time: 365, str: 'year' }, { time: 30, str: 'month' }, { time: 7, str: 'week' }, { time: 1, str: 'day' }]
         for (const value of vals) {
           if (days >= value.time) {
             var time = Math.floor(days / value.time)
-            if (time === 1) {
-              return `1 ${value.str} ago`
-            }
-            return `${time} ${value.str}s ago`
+            return time === 1 ? `1 ${value.str} ago` : `${time} ${value.str}s ago`
           }
         }
         return ''
@@ -66,7 +63,7 @@ export default {
     },
     duration: {
       get () {
-        var seconds = this.localInfo.length_seconds
+        var seconds = this.localInfo.videoDetails.lengthSeconds
         var output = ''
         const vals = [3600, 60]
         vals.forEach((value, index) => {
@@ -78,26 +75,6 @@ export default {
         })
         output += output === '' ? `0:${seconds.toString().padStart(2, '0')}` : `${seconds.toString().padStart(2, '0')}`
         return output
-        /*
-        if (seconds >= 3600) {
-          hours = Math.floor(seconds / 3600)
-          seconds -= hours * 3600
-          output += `${hours.toString().padStart(2, '0')}:`
-        }
-        if (seconds >= 60) {
-          minutes = Math.floor(seconds / 60)
-          seconds -= minutes * 60
-          if (hours > 0) {
-            output += `${minutes.toString().padStart(2, '0')}:`
-          } else {
-            output += `${minutes}:`
-          }
-        } else {
-          output += '0:'
-        }
-        output += `${seconds.toString().padStart(2, '0')}`
-        return output
-        */
       }
     }
   },
