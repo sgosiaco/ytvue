@@ -21,7 +21,7 @@
     "ytdl-core": "^4.4.0"
   },
   "devDependencies": {
-    "@quasar/app": "^1.0.0",
+    "@quasar/app": "^2.4.3",
     "babel-eslint": "^10.0.1",
     "devtron": "^1.4.0",
     "electron": "^8.2.3",
